@@ -1,0 +1,1 @@
+docker build -t kddcup12:latest .
