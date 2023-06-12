@@ -12,12 +12,10 @@ class KDDcupDataset(IterableDataset):
         self.feature_names = ['target', 'display_url', 'ad_id', 'advertiser_id', 
                               'depth', 'position', 'user_id', 'gender', 'age',
                               'keyword', 'title', 'description', 'query']
-        self.keyword_vocab = json.load(open('../data/keyword_vocab.json', 'r'))
-        self.title_vocab = json.load(open('../data/title_vocab.json', 'r'))
-        self.description_vocab = json.load(open('../data/description_vocab.json', 'r'))
         self.keyword_sequence_len = 16
         self.title_sequence_len = 32
         self.description_sequence_len = 50
+        self.query_sequence_len = 128
         
     def preprocess_line(self, line):
         ret = dict()
@@ -29,13 +27,16 @@ class KDDcupDataset(IterableDataset):
         ret['target'] = line['target']
         ret['numeric'] = torch.cat([line['depth'], line['position'], line['gender'], line['age']], dim=0)
 
-        line['keyword'] = torch.tensor([self.keyword_vocab[str(el)] for el in line['keyword'].split('|') if str(el) in self.keyword_vocab], dtype=torch.int64)
-        line['title'] = torch.tensor([self.title_vocab[str(el)] for el in line['title'].split('|') if str(el) in self.title_vocab], dtype=torch.int64)
-        line['description'] = torch.tensor([self.description_vocab[str(el)] for el in line['description'].split('|') if str(el) in self.description_vocab], dtype=torch.int64)
+        line['keyword'] = torch.tensor([int(el) for el in line['keyword'].split('|')], dtype=torch.int64)
+        line['title'] = torch.tensor([int(el) for el in line['title'].split('|')], dtype=torch.int64)
+        line['description'] = torch.tensor([int(el) for el in line['description'].split('|')], dtype=torch.int64)
+        line['query'] = torch.tensor([int(el) for el in line['query'].split('|')], dtype=torch.int64)
 
         ret['keyword'] = nn.ConstantPad1d((0, self.keyword_sequence_len - len(line['keyword'])), 0)(line['keyword'])
         ret['title'] = nn.ConstantPad1d((0, self.title_sequence_len - len(line['title'])), 0)(line['title'])
         ret['description'] = nn.ConstantPad1d((0, self.description_sequence_len - len(line['description'])), 0)(line['description'])
+        ret['query'] = nn.ConstantPad1d((0, self.query_sequence_len - len(line['query'])), 0)(line['query'])
+        ret['advertiser'] = torch.tensor([int(line['advertiser_id'])], dtype=torch.int64)
         
         return ret
 
