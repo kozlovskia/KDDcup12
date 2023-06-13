@@ -109,31 +109,35 @@ class Model(nn.Module):
                  text_processor_description_args,
                  text_processor_query_args,  
                  soft_ordering_args,
-                 advertiser_embedding_dim):
+                 other_embedding_dim):
         super().__init__()
         self.text_processor_keyword_args = text_processor_keyword_args
         self.text_processor_title_args = text_processor_title_args
         self.text_processor_description_args = text_processor_description_args
         self.text_processor_query_args = text_processor_query_args
         self.soft_ordering_args = soft_ordering_args
-        self.advertiser_embedding_dim = advertiser_embedding_dim
+        self.other_embedding_dim = other_embedding_dim
 
         self.text_processor_keyword = TextProcessingCNN(**self.text_processor_keyword_args)
         self.text_processor_title = TextProcessingCNN(**self.text_processor_title_args)
         self.text_processor_description = TextProcessingCNN(**self.text_processor_description_args)
         self.text_processor_query = TextProcessingCNN(**self.text_processor_query_args)
 
-        self.advertiser_embedding = nn.Embedding(14705 + 1, self.advertiser_embedding_dim, padding_idx=0)
+        self.advertiser_embedding = nn.Embedding(14705 + 1, self.other_embedding_dim, padding_idx=0)
+        self.ad_embedding = nn.Embedding(10000 + 1, self.other_embedding_dim, padding_idx=0)
+        self.display_embedding = nn.Embedding(10000 + 1, self.other_embedding_dim, padding_idx=0)
 
         self.soft_ordering = SoftOrdering1DCNN(**self.soft_ordering_args)
 
-    def forward(self, keyword_x, title_x, description_x, query_x, advertiser_x, num_x):
+    def forward(self, keyword_x, title_x, description_x, query_x, advertiser_x, ad_x, display_x, num_x):
         keyword_x = self.text_processor_keyword(keyword_x)
         title_x = self.text_processor_title(title_x)
         description_x = self.text_processor_description(description_x)
         query_x = self.text_processor_query(query_x)
         advertiser_x = self.advertiser_embedding(advertiser_x).view(advertiser_x.size(0), -1)
+        ad_x = self.ad_embedding(ad_x).view(ad_x.size(0), -1)
+        display_x = self.display_embedding(display_x).view(display_x.size(0), -1)
         num_x = num_x.view(num_x.size(0), -1)
-        x = torch.cat((keyword_x, title_x, description_x, query_x, advertiser_x, num_x), dim=1)
+        x = torch.cat((keyword_x, title_x, description_x, query_x, advertiser_x, ad_x, display_x, num_x), dim=1)
         x = self.soft_ordering(x)
         return x

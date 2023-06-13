@@ -24,14 +24,14 @@ def main():
     test_dataset = KDDcupDataset('../data/D80M_test.tsv')
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=0)
 
-    keyword_processor_args = {'sequence_len': 16, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 100}
-    title_processor_args = {'sequence_len': 32, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 100}
+    keyword_processor_args = {'sequence_len': 16, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 32}
+    title_processor_args = {'sequence_len': 32, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 64}
     description_processor_args = {'sequence_len': 50, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 100}
-    query_processor_args = {'sequence_len': 128, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 100}
-    soft_ordering_args = {'input_dim': 4*3*100+16+11, 'output_dim': 1, 'in_num_kernels': 256, 'chunk_size': 16}
-    advertiser_embedding_dim = 16
+    query_processor_args = {'sequence_len': 128, 'num_words': 10000, 'embedding_dim': 128, 'conv_out_size': 256}
+    soft_ordering_args = {'input_dim': 3*(32+64+100+256)+3*16+11, 'output_dim': 1, 'in_num_kernels': 256, 'chunk_size': 16}
+    other_embedding_dim = 16
     model = Model(keyword_processor_args, title_processor_args, description_processor_args, 
-                  query_processor_args, soft_ordering_args, advertiser_embedding_dim)
+                  query_processor_args, soft_ordering_args, other_embedding_dim)
     model = model.cuda()
     model.train()
 
@@ -41,6 +41,7 @@ def main():
         t_s = time()
         model.train()
         cum_loss = 0.0
+        aucs = []
         for i, batch in enumerate(train_dataloader):
             target = batch['target'].cuda()
             input_keyword = batch['keyword'].cuda()
@@ -48,18 +49,20 @@ def main():
             input_description = batch['description'].cuda()
             input_query = batch['query'].cuda()
             input_advertiser = batch['advertiser'].cuda()
+            input_ad = batch['ad'].cuda()
+            input_display = batch['display'].cuda()
             input_num = batch['numeric'].cuda()
-            output = model(input_keyword, input_title, input_description, input_query, input_advertiser, input_num)
+            output = model(input_keyword, input_title, input_description, input_query, input_advertiser, input_ad, input_display, input_num)
             loss = torch.nn.functional.binary_cross_entropy_with_logits(output, target, reduction='sum')
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             loss_value = loss.detach().item()
             cum_loss += loss_value
-            if i % 100 == 0:
-                auc = roc_auc_score(target.detach().cpu().numpy(), output.detach().cpu().numpy())
-                print(f'Epoch {epoch} | batch {i} / {int(train_data_amount // batch_size)} | loss: {cum_loss / ((i + 1) * batch_size):4f} | ',
-                      f'last batch AUC: {auc:4f} | time: {round(time() - t_s)} sec(s)', end='\r')
+            if i % 100 == 0 and i > 0:
+                aucs.append(roc_auc_score(target.detach().cpu().numpy(), output.detach().cpu().numpy()))
+                print(f'Epoch {epoch} | batch {i} / {int(train_data_amount // batch_size)} | loss: {cum_loss / ((i + 1) * batch_size):4f} |',
+                      f'est. AUC: {sum(aucs) / (i // 100) :4f} | time: {round(time() - t_s)} sec(s)', end='\r')
                 
         print(f'Epoch {epoch} loss: {cum_loss / train_data_amount}, time: {(time() - t_s):4f} sec(s)')
     
@@ -76,8 +79,10 @@ def main():
                 input_description = batch['description'].cuda()
                 input_query = batch['query'].cuda()
                 input_advertiser = batch['advertiser'].cuda()
+                input_ad = batch['ad'].cuda()
+                input_display = batch['display'].cuda()
                 input_num = batch['numeric'].cuda()
-                output = model(input_keyword, input_title, input_description, input_query, input_advertiser, input_num)
+                output = model(input_keyword, input_title, input_description, input_query, input_advertiser, input_ad, input_display, input_num)
                 loss = torch.nn.functional.binary_cross_entropy_with_logits(output, target, reduction='sum')
                 loss_value = loss.detach().item()
                 cum_loss += loss_value
