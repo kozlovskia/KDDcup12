@@ -6,3 +6,4 @@ data/D80M_train.tsv
 data/D80M.tsv
 results/
 !results/preds.csv
+!results/model_2023_06_13/model_2.pth
