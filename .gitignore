@@ -4,3 +4,5 @@ data/D5M_test_x.tsv.gz
 data/D80M_test.tsv
 data/D80M_train.tsv
 data/D80M.tsv
+results/
+!results/preds.csv
